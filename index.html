@@ -265,16 +265,17 @@
 <script>
 /* ===================== CONFIG (the only bit you need to touch) ===================== */
 const CONFIG = {
-  herName:   '',            // e.g. 'Sofia'  -> "for Sofia" on the envelope, "dear Sofia," on the letter
-  yourName:  '',            // e.g. 'Noah'   -> "with love, Noah"
+  herName:   'amy',         // -> "for amy" on the envelope
+  greeting:  'my princess amy,',   // top of the letter ('' falls back to "dear <herName>,")
+  signoff:   'with love, your noah',   // bottom of the letter
   dateText:  '',            // e.g. 'September 20, 2026' (shown under the sign-off; leave '' to hide)
   photos: [                 // drop files in /photos and list them here; leave [] for no strip
     // { src: 'photos/her.jpg', caption: 'you' },
     // { src: 'photos/first-message.png', caption: 'where it started' },
   ],
   typeSpeed: 24,            // ms per character
-  hint: 'hint: you already know it 🎵',   // shown under "prove it's you"; '' to hide
-  wrongTries: ['hmm, not quite 🐾', 'nope, try again', 'think about it…', 'you know this one 🎀'],
+  hint: 'hint: four paws, zero respect for your sleep 🐱',   // shown under "prove it's you"; '' to hide
+  wrongTries: ['hmm, not quite 🐾', 'think smaller. fluffier. 🐱', 'who really runs your house?', 'the cat, amy. the cat 🎀'],
 };
 /* =================================================================================== */
 
@@ -284,7 +285,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---- names ---- */
 if (CONFIG.herName) { $('envName').textContent = 'for ' + CONFIG.herName; $('greeting').textContent = 'dear ' + CONFIG.herName + ','; }
-if (CONFIG.yourName) $('fromLine').textContent = 'with love, ' + CONFIG.yourName;
+if (CONFIG.greeting) $('greeting').textContent = CONFIG.greeting;
+if (CONFIG.signoff) $('fromLine').textContent = CONFIG.signoff;
 if (CONFIG.dateText) $('dateLine').textContent = CONFIG.dateText;
 $('hint').textContent = CONFIG.hint || '';
 
