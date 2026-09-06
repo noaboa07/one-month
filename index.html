@@ -52,6 +52,19 @@
     padding:24px;opacity:0;pointer-events:none;transition:opacity .6s ease;
   }
   .screen.active{opacity:1;pointer-events:auto}
+  .screen{z-index:1}
+
+  /* ---------- melody, fading in behind the finished letter ---------- */
+  #bgPhoto{
+    position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 4s ease;
+    background:
+      linear-gradient(180deg,rgba(255,214,231,.55),rgba(255,214,231,.7)),
+      url("photos/melody.jpg") 20% 30%/cover no-repeat;
+    filter:saturate(.85);
+  }
+  #bgPhoto.show{opacity:1}
+  #letterScreen.peek{padding-bottom:62vh}   /* room to scroll the card up and see melody underneath */
+  @media (max-width:600px){ #bgPhoto{background-size:auto 200%;background-position:5% 28%} }
   #letterScreen{justify-content:flex-start;overflow-y:auto;padding:56px 16px 80px;-webkit-overflow-scrolling:touch}
 
   /* ---------- envelope ---------- */
@@ -206,6 +219,8 @@
     </symbol>
   </defs>
 </svg>
+
+<div id="bgPhoto" aria-hidden="true"></div>
 
 <!-- 1. envelope -->
 <section class="screen active" id="envScreen">
@@ -410,7 +425,9 @@ async function startLetter() {
     $('banner').classList.add('show');
     renderPhotos();
     setTimeout(() => burst(), 400);
+    setTimeout(() => { $('bgPhoto').classList.add('show'); $('letterScreen').classList.add('peek'); }, 1200);   // melody fades in behind the card
   };
+  new Image().src = 'photos/melody.jpg';   // warm the cache while she reads
   if (reduced) return finish();
   skip.hidden = false;
   skip.onclick = () => { skipped = true; };
