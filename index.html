@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>for you 🎀</title>
 <meta name="theme-color" content="#ffd6e7">
+<meta name="robots" content="noindex, nofollow, noarchive">
 <meta property="og:title" content="a little letter for you 🎀">
 <meta property="og:description" content="open me? (yes or no… but mostly yes)">
 <meta property="og:type" content="website">
@@ -127,6 +128,21 @@
   .spacer{display:inline-block;visibility:hidden}
   .bow-sm{width:74px;margin-bottom:6px;filter:drop-shadow(0 4px 8px rgba(194,0,47,.3))}
 
+  /* ---------- lock ---------- */
+  .paw-sm{width:64px;margin-bottom:4px;fill:var(--pink);filter:drop-shadow(0 4px 8px rgba(194,0,47,.25))}
+  .lock-form{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;width:min(420px,100%)}
+  .lock-form input{
+    flex:1 1 200px;min-width:0;font-family:var(--body);font-weight:700;font-size:1.1rem;color:var(--ink);
+    border:3px solid #fff;background:rgba(255,255,255,.85);border-radius:999px;padding:14px 22px;outline:0;text-align:center;
+    box-shadow:0 8px 20px -10px rgba(74,44,58,.3);transition:border-color .2s,transform .2s
+  }
+  .lock-form input:focus{border-color:var(--pink)}
+  .lock-form input::placeholder{color:var(--ink-soft);opacity:.7;font-weight:600}
+  .lock-form.shake input{animation:shake .45s;border-color:var(--red)}
+  .lock-form .btn{padding:14px 30px}
+  .err{min-height:1.4em;margin:14px 0 0;color:var(--red);font-weight:700;text-align:center}
+  @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+
   /* ---------- letter ---------- */
   .card{
     position:relative;width:min(640px,100%);background:var(--cream);border-radius:22px;
@@ -204,6 +220,18 @@
   <p class="hint">tap the envelope 🐾</p>
 </section>
 
+<!-- 1b. lock -->
+<section class="screen" id="lockScreen">
+  <svg class="paw-sm" viewBox="0 0 100 100"><use href="#paw"/></svg>
+  <h1>prove it's you 🐾</h1>
+  <p class="sub" id="hint"></p>
+  <form class="lock-form" id="lockForm" autocomplete="off">
+    <input id="pass" type="password" placeholder="the secret word" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="secret word">
+    <button class="btn btn-yes" type="submit">unlock</button>
+  </form>
+  <p class="err" id="lockErr" aria-live="polite"></p>
+</section>
+
 <!-- 2. question -->
 <section class="screen" id="qScreen">
   <svg class="bow-sm" viewBox="0 0 100 70"><use href="#bow"/></svg>
@@ -234,13 +262,6 @@
 
 <canvas id="fx"></canvas>
 
-<!-- fallback copy of the letter, used only when letter.txt can't be fetched (e.g. opened as a local file) -->
-<template id="letterFallback">
-[PASTE YOUR LETTER HERE]
-
-This is the fallback copy inside index.html. The live page reads letter.txt instead, so you normally only edit that file.
-</template>
-
 <script>
 /* ===================== CONFIG (the only bit you need to touch) ===================== */
 const CONFIG = {
@@ -252,6 +273,8 @@ const CONFIG = {
     // { src: 'photos/first-message.png', caption: 'where it started' },
   ],
   typeSpeed: 24,            // ms per character
+  hint: 'hint: you already know it 🎵',   // shown under "prove it's you"; '' to hide
+  wrongTries: ['hmm, not quite 🐾', 'nope, try again', 'think about it…', 'you know this one 🎀'],
 };
 /* =================================================================================== */
 
@@ -263,6 +286,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 if (CONFIG.herName) { $('envName').textContent = 'for ' + CONFIG.herName; $('greeting').textContent = 'dear ' + CONFIG.herName + ','; }
 if (CONFIG.yourName) $('fromLine').textContent = 'with love, ' + CONFIG.yourName;
 if (CONFIG.dateText) $('dateLine').textContent = CONFIG.dateText;
+$('hint').textContent = CONFIG.hint || '';
 
 /* ---- screens ---- */
 function show(id) {
@@ -276,8 +300,40 @@ let opened = false;
 function openEnvelope() {
   if (opened) return; opened = true;
   envelope.classList.add('open');
-  setTimeout(() => show('qScreen'), reduced ? 100 : 1500);
+  setTimeout(() => { show('lockScreen'); setTimeout(() => $('pass').focus(), 400); }, reduced ? 100 : 1500);
 }
+
+/* ---- 1b. the lock (PBKDF2 + AES-GCM; letter.enc.json holds only ciphertext) ---- */
+let letterText = null, encPromise = null, wrong = 0;
+const norm = s => s.toLowerCase().replace(/\s+/g, '');
+const fromB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+function getEnc() { return encPromise ||= fetch('letter.enc.json', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+async function tryUnlock(pass) {
+  const enc = await getEnc();
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(norm(pass)), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: fromB64(enc.salt), iterations: 200000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(enc.iv) }, key, fromB64(enc.data))); }
+  catch (_) { return null; }
+}
+$('lockForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.currentTarget, input = $('pass'), err = $('lockErr'), btn = form.querySelector('button');
+  if (!norm(input.value)) { input.focus(); return; }
+  btn.disabled = true; btn.textContent = '…';
+  let text = null;
+  try { text = await tryUnlock(input.value); }
+  catch (ex) { err.textContent = "couldn't load the letter, check your connection 🐾"; btn.disabled = false; btn.textContent = 'unlock'; return; }
+  btn.disabled = false; btn.textContent = 'unlock';
+  if (text === null) {
+    err.textContent = CONFIG.wrongTries[Math.min(wrong++, CONFIG.wrongTries.length - 1)];
+    form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+    input.select();
+    return;
+  }
+  letterText = text; err.textContent = '';
+  burst(btn.getBoundingClientRect());
+  setTimeout(() => show('qScreen'), 500);
+});
 envelope.addEventListener('click', openEnvelope);
 envelope.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEnvelope(); } });
 
@@ -332,12 +388,7 @@ yes.addEventListener('click', () => {
 
 /* ---- 3. letter ---- */
 async function loadLetter() {
-  let text = '';
-  try {
-    const res = await fetch('letter.txt', { cache: 'no-store' });
-    if (res.ok) text = await res.text();
-  } catch (_) { /* file:// or offline */ }
-  if (!text.trim()) text = $('letterFallback').innerHTML;
+  const text = letterText || '';
   return text.replace(/\r/g, '').trim().split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 }
 

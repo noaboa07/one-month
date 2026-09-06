@@ -1,5 +1,0 @@
-[PASTE YOUR LETTER HERE]
-
-Each blank line starts a new paragraph. Write as many as you want. This text is loaded when the page opens, so you can rewrite it any time without touching the code.
-
-The last paragraph is a good place for the thing you most want her to remember.
