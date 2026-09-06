@@ -156,6 +156,7 @@
   .ear.l{left:34px;transform:rotate(-8deg)} .ear.r{right:34px;transform:rotate(8deg)}
   .card-bow{position:absolute;left:50%;top:-34px;width:96px;transform:translateX(-50%) rotate(-6deg);filter:drop-shadow(0 6px 10px rgba(194,0,47,.3))}
   .greeting{font-family:var(--script);font-weight:400;color:var(--red);font-size:clamp(1.6rem,5.5vw,2.2rem);line-height:64px;margin:0}
+  .body strong{font-weight:800;color:var(--red-deep)}
   .body p{margin:0 0 32px;font-size:1.08rem;line-height:32px;min-height:32px;font-weight:600;color:var(--ink);white-space:pre-wrap}
   .cursor::after{content:"";display:inline-block;width:2px;height:1.05em;background:var(--pink);vertical-align:-3px;margin-left:2px;animation:blink .9s steps(1) infinite}
   .skip{position:fixed;right:16px;top:14px;z-index:5;background:rgba(255,255,255,.75);backdrop-filter:blur(6px);color:var(--ink-soft);border:0;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;font-family:var(--body);transition:opacity .3s}
@@ -400,8 +401,10 @@ async function startLetter() {
   const body = $('letterBody'), skip = $('skipBtn');
   body.innerHTML = '';
   const els = paras.map(() => { const p = document.createElement('p'); body.appendChild(p); return p; });
+  const segs = paras.map(t => { const out = []; t.split(/(\*\*[^*]+\*\*)/).forEach(s => { if (!s) return; const m = s.match(/^\*\*([^*]+)\*\*$/); out.push(m ? { text: m[1], bold: true } : { text: s, bold: false }); }); return out; });
+  const render = (p, segList) => { p.textContent = ''; segList.forEach(sg => { const n = sg.bold ? document.createElement('strong') : document.createTextNode(''); n.textContent = sg.text; p.appendChild(n); }); };
   const finish = () => {
-    els.forEach((p, i) => { p.textContent = paras[i]; p.classList.remove('cursor'); });
+    els.forEach((p, i) => { render(p, segs[i]); p.classList.remove('cursor'); });
     skip.hidden = true;
     $('signoff').classList.add('show');
     $('banner').classList.add('show');
@@ -412,12 +415,17 @@ async function startLetter() {
   skip.hidden = false;
   skip.onclick = () => { skipped = true; };
   for (let i = 0; i < paras.length && !skipped; i++) {
-    const p = els[i], text = paras[i];
+    const p = els[i];
     p.classList.add('cursor');
-    for (let c = 0; c < text.length && !skipped; c++) {
-      p.textContent += text[c];
-      const ch = text[c];
-      await sleep(/[.!?]/.test(ch) ? CONFIG.typeSpeed * 9 : /[,;:]/.test(ch) ? CONFIG.typeSpeed * 4 : CONFIG.typeSpeed);
+    for (const sg of segs[i]) {
+      if (skipped) break;
+      const n = sg.bold ? document.createElement('strong') : document.createTextNode('');
+      p.appendChild(n);
+      for (let c = 0; c < sg.text.length && !skipped; c++) {
+        n.textContent += sg.text[c];
+        const ch = sg.text[c];
+        await sleep(/[.!?]/.test(ch) ? CONFIG.typeSpeed * 9 : /[,;:]/.test(ch) ? CONFIG.typeSpeed * 4 : CONFIG.typeSpeed);
+      }
     }
     p.classList.remove('cursor');
     if (!skipped) await sleep(CONFIG.typeSpeed * 12);
